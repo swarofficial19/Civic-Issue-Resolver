@@ -1,0 +1,6 @@
+{
+  "name": "CivicSolve",
+  "description": "National crowdsourced civic issue resolution & SLA tracking portal for Municipal Corporations across India featuring geotagged photo capture, voice notes, Gemini AI auto-routing, state & corporation routing, and interactive GIS map dashboard.",
+  "requestFramePermissions": ["camera", "microphone", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

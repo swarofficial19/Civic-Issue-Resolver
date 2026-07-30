@@ -1,0 +1,41 @@
+{
+  "entities": {
+    "CivicReport": {
+      "title": "Civic Report",
+      "description": "A municipal grievance report filed by a citizen or auto-generated",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique document identifier" },
+        "ticketNo": { "type": "string", "description": "Human-readable ticket reference e.g. CS-2026-9081" },
+        "title": { "type": "string", "maxLength": 300 },
+        "category": { "type": "string", "enum": ["Sanitation", "Electrical", "Roads", "Water", "Public Safety"] },
+        "description": { "type": "string", "maxLength": 5000 },
+        "priority": { "type": "string", "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"] },
+        "status": { "type": "string", "enum": ["Submitted", "Acknowledged", "In Progress", "Resolved"] },
+        "location": { "type": "object", "description": "Geographical location with coordinates and municipality" },
+        "imageUrl": { "type": "string" },
+        "audioUrl": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "assignedOfficer": { "type": "object" },
+        "slaHours": { "type": "number" },
+        "slaDueDate": { "type": "string" },
+        "isSlaOverdue": { "type": "boolean" },
+        "proofOfResolution": { "type": "object" },
+        "aiAnalysis": { "type": "object" },
+        "timeline": { "type": "array" },
+        "reporterName": { "type": "string", "maxLength": 100 },
+        "reporterPhone": { "type": "string", "maxLength": 20 },
+        "reporterEmail": { "type": "string", "maxLength": 100 },
+        "isAnonymous": { "type": "boolean" }
+      },
+      "required": ["id", "ticketNo", "title", "category", "description", "priority", "status", "location", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/reports/{reportId}": {
+      "schema": "CivicReport",
+      "description": "Global collection of civic reports filed across municipal corporations"
+    }
+  }
+}

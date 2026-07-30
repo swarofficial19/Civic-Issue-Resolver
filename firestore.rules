@@ -1,0 +1,49 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidReport(data) {
+      return data.keys().hasAll(['id', 'ticketNo', 'title', 'category', 'description', 'priority', 'status', 'location', 'createdAt'])
+        && data.id is string && data.id.size() <= 128
+        && data.ticketNo is string && data.ticketNo.size() <= 64
+        && data.title is string && data.title.size() <= 300
+        && data.category in ['Sanitation', 'Electrical', 'Roads', 'Water', 'Public Safety']
+        && data.description is string && data.description.size() <= 5000
+        && data.priority in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
+        && data.status in ['Submitted', 'Acknowledged', 'In Progress', 'Resolved']
+        && data.location is map
+        && data.createdAt is string;
+    }
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Test connection endpoint
+    match /test/{docId} {
+      allow read, write: if true;
+    }
+
+    // Civic Reports Collection
+    match /reports/{reportId} {
+      allow read: if true;
+      allow create: if isValidId(reportId) && isValidReport(incoming());
+      allow update: if isValidId(reportId) && isValidReport(incoming());
+      allow delete: if false;
+    }
+  }
+}
