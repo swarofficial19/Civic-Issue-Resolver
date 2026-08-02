@@ -39,7 +39,7 @@ export const getStateForMunicipality = (district: string = '', address: string =
   if (d.includes('patna') || a.includes('bihar')) return 'Bihar';
   if (d.includes('lucknow') || d.includes('kanpur') || d.includes('varanasi') || d.includes('ghaziabad') || d.includes('noida') || d.includes('agra') || d.includes('meerut') || d.includes('bareilly') || d.includes('moradabad') || d.includes('prayagraj') || a.includes('uttar pradesh')) return 'Uttar Pradesh';
   if (d.includes('jaipur') || d.includes('jodhpur') || d.includes('kota') || a.includes('rajasthan')) return 'Rajasthan';
-  if (d.includes('ahmedabad') || d.includes('surat') || d.includes('vadodara') || d.includes('rajkot') || a.includes('gujarat')) return 'Gujarat';
+  if (d.includes('ahmedabad') || d.includes('surat') || d.includes('vadodara') || d.includes('rajkot') || d.includes('navsari') || a.includes('gujarat') || a.includes('navsari')) return 'Gujarat';
   if (d.includes('bhubaneswar') || d.includes('cuttack') || a.includes('odisha')) return 'Odisha';
   if (d.includes('chandigarh') || d.includes('ludhiana') || d.includes('amritsar') || a.includes('punjab')) return 'Punjab';
   if (d.includes('guwahati') || a.includes('assam')) return 'Assam';

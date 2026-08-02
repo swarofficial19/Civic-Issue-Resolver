@@ -38,7 +38,8 @@ export const INITIAL_OFFICERS: Officer[] = [
 
   // Uttar Pradesh & Gujarat
   { id: 'off-20', name: 'Manoj Tripathi', designation: 'Streetlight Infrastructure Head', phone: '+91 94150 22301', department: 'Electrical', state: 'Uttar Pradesh', municipality: 'Lucknow (LMC)', sector: 'Gomti Nagar Infrastructure' },
-  { id: 'off-21', name: 'Chintan Patel', designation: 'Roads & Bridges Engineer', phone: '+91 98250 11920', department: 'Roads', state: 'Gujarat', municipality: 'Ahmedabad (AMC)', sector: 'Sabarmati & CG Road Sector' }
+  { id: 'off-21', name: 'Chintan Patel', designation: 'Roads & Bridges Engineer', phone: '+91 98250 11920', department: 'Roads', state: 'Gujarat', municipality: 'Ahmedabad (AMC)', sector: 'Sabarmati & CG Road Sector' },
+  { id: 'off-22', name: 'Jignesh Contractor', designation: 'Chief Sanitation Officer', phone: '+91 98240 77123', department: 'Sanitation', state: 'Gujarat', municipality: 'Navsari (NMC)', sector: 'Navsari Central Zone' }
 ];
 
 export const INITIAL_REPORTS: CivicReport[] = [];
@@ -53,6 +54,7 @@ export const INDIAN_MUNICIPALITIES: District[] = [
   'Ahmedabad (AMC)',
   'Pune (PMC)',
   'Surat (SMC)',
+  'Navsari (NMC)',
   'Jaipur (JMC)',
   'Lucknow (LMC)',
   'Kanpur (KNN)',

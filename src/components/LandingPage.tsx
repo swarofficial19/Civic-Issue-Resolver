@@ -227,7 +227,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           {[
             'Delhi (MCD)', 'Mumbai (BMC)', 'Bengaluru (BBMP)', 'Kolkata (KMC)', 'Chennai (GCC)', 
             'Hyderabad (GHMC)', 'Bhopal (BMC)', 'Indore (IMC)', 'Ranchi (RMC)', 'Patna (PMC)', 
-            'Lucknow (LMC)', 'Jaipur (JMC)', 'Ahmedabad (AMC)', 'Pune (PMC)', 'Surat (SMC)'
+            'Lucknow (LMC)', 'Jaipur (JMC)', 'Ahmedabad (AMC)', 'Pune (PMC)', 'Surat (SMC)', 'Navsari (NMC)'
           ].map(city => (
             <span key={city} className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-semibold shadow-xs">
               {city}

@@ -37,7 +37,7 @@ function AppContent() {
     return sessionStorage.getItem('civicsolve_officer_auth') === 'true';
   });
 
-  const [officerInfo, setOfficerInfo] = useState<{ name: string; department: string; badgeId: string } | null>(() => {
+  const [officerInfo, setOfficerInfo] = useState<{ name: string; department: string; badgeId: string; email?: string } | null>(() => {
     const saved = sessionStorage.getItem('civicsolve_officer_info');
     if (saved) {
       try {
@@ -61,18 +61,23 @@ function AppContent() {
     return () => unsubscribe();
   }, []);
 
-  const handleOfficerAuthenticate = (info: { name: string; department: string; badgeId: string }) => {
+  const handleOfficerAuthenticate = (info: { name: string; department: string; badgeId: string; email?: string }) => {
     setIsOfficerAuthenticated(true);
     setOfficerInfo(info);
     sessionStorage.setItem('civicsolve_officer_auth', 'true');
     sessionStorage.setItem('civicsolve_officer_info', JSON.stringify(info));
   };
 
-  const handleOfficerLogout = () => {
+  const handleOfficerLogout = async () => {
     setIsOfficerAuthenticated(false);
     setOfficerInfo(null);
     sessionStorage.removeItem('civicsolve_officer_auth');
     sessionStorage.removeItem('civicsolve_officer_info');
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.warn('Signout error:', e);
+    }
     setActiveTab('landing');
     toast.info('Session locked. Logged out from Officer Command Room.', 'Command Room Locked');
   };
@@ -435,20 +440,27 @@ function AppContent() {
             </motion.div>
           ) : activeTab === 'admin' ? (
             <motion.div
-              key="admin-portal"
+              key={isOfficerAuthenticated ? "admin-portal" : "officer-login"}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.22, ease: 'easeOut' }}
             >
-              <AdminPortal
-                reports={reports}
-                onUpdateStatus={handleUpdateStatus}
-                onAssignOfficer={handleAssignOfficer}
-                onOpenResolutionModal={setResolutionModalReport}
-                officerInfo={officerInfo}
-                onLogoutOfficer={handleOfficerLogout}
-              />
+              {isOfficerAuthenticated ? (
+                <AdminPortal
+                  reports={reports}
+                  onUpdateStatus={handleUpdateStatus}
+                  onAssignOfficer={handleAssignOfficer}
+                  onOpenResolutionModal={setResolutionModalReport}
+                  officerInfo={officerInfo}
+                  onLogoutOfficer={handleOfficerLogout}
+                />
+              ) : (
+                <OfficerLogin
+                  onAuthenticate={handleOfficerAuthenticate}
+                  onCancel={() => setActiveTab('landing')}
+                />
+              )}
             </motion.div>
           ) : null}
         </AnimatePresence>

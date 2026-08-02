@@ -77,6 +77,112 @@ export async function testFirestoreConnection(): Promise<boolean> {
 
 // Firestore Reports collection reference
 const REPORTS_COLLECTION = 'reports';
+const OFFICERS_COLLECTION = 'officers';
+
+export interface OfficerRecord {
+  id?: string;
+  email: string;
+  name: string;
+  department: string;
+  badgeId: string;
+  role?: string;
+  createdAt?: string;
+  addedBy?: string;
+}
+
+// Fetch officer record from Firestore by email
+export async function getOfficerRecordByEmail(email: string): Promise<OfficerRecord | null> {
+  if (!email) return null;
+  const cleanEmail = email.trim().toLowerCase();
+  const docId = cleanEmail.replace(/[^a-zA-Z0-9]/g, '_');
+
+  try {
+    // 1. Direct document lookup
+    const officerDoc = await getDocFromServer(doc(db, OFFICERS_COLLECTION, docId));
+    if (officerDoc.exists()) {
+      return officerDoc.data() as OfficerRecord;
+    }
+
+    // 2. Query lookup by email field
+    const q = query(collection(db, OFFICERS_COLLECTION));
+    const snapshot = await getDocs(q);
+    let match: OfficerRecord | null = null;
+    snapshot.forEach((doc) => {
+      const data = doc.data() as OfficerRecord;
+      if (data.email && data.email.trim().toLowerCase() === cleanEmail) {
+        match = data;
+      }
+    });
+
+    return match;
+  } catch (err) {
+    console.warn('Failed to fetch officer record from Firestore:', err);
+    return null;
+  }
+}
+
+// Save or Update an Officer in Firestore
+export async function saveOfficerToFirestore(officer: OfficerRecord): Promise<void> {
+  const cleanEmail = officer.email.trim().toLowerCase();
+  const docId = cleanEmail.replace(/[^a-zA-Z0-9]/g, '_');
+  const path = `${OFFICERS_COLLECTION}/${docId}`;
+
+  try {
+    const docRef = doc(db, OFFICERS_COLLECTION, docId);
+    await setDoc(docRef, {
+      ...officer,
+      email: cleanEmail,
+      createdAt: officer.createdAt || new Date().toISOString()
+    }, { merge: true });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, path);
+  }
+}
+
+// Fetch all registered officers from Firestore
+export async function fetchAllOfficersFromFirestore(): Promise<OfficerRecord[]> {
+  try {
+    const q = query(collection(db, OFFICERS_COLLECTION));
+    const snapshot = await getDocs(q);
+    const officers: OfficerRecord[] = [];
+    snapshot.forEach((doc) => {
+      officers.push(doc.data() as OfficerRecord);
+    });
+    return officers;
+  } catch (err) {
+    console.warn('Error listing officers from Firestore:', err);
+    return [];
+  }
+}
+
+// Delete / Revoke Officer from Firestore
+export async function deleteOfficerFromFirestore(email: string): Promise<void> {
+  if (!email) return;
+  const cleanEmail = email.trim().toLowerCase();
+  const docId = cleanEmail.replace(/[^a-zA-Z0-9]/g, '_');
+  try {
+    // Delete directly by document ID
+    const docRef = doc(db, OFFICERS_COLLECTION, docId);
+    await deleteDoc(docRef);
+
+    // Also search by email query in case document ID was created differently
+    const q = query(collection(db, OFFICERS_COLLECTION));
+    const snapshot = await getDocs(q);
+    const deletePromises: Promise<void>[] = [];
+    snapshot.forEach((d) => {
+      const data = d.data() as OfficerRecord;
+      if (data.email && data.email.trim().toLowerCase() === cleanEmail) {
+        deletePromises.push(deleteDoc(d.ref));
+      }
+    });
+    if (deletePromises.length > 0) {
+      await Promise.all(deletePromises);
+    }
+  } catch (err) {
+    console.error('Error deleting officer from Firestore:', err);
+    throw err;
+  }
+}
 
 // Save or Update a report in Firestore
 export async function saveReportToFirestore(report: CivicReport): Promise<void> {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CivicReport, Department, Priority, ReportStatus, District, FilterState, Officer } from '../types';
 import { GisMap } from './GisMap';
 import { INITIAL_OFFICERS, INDIAN_MUNICIPALITIES } from '../data/seedData';
@@ -23,17 +23,30 @@ import {
   Building2,
   Calendar,
   Users,
-  LogOut
+  LogOut,
+  Crown,
+  Trash2,
+  RefreshCw
 } from 'lucide-react';
+import { 
+  auth, 
+  fetchAllOfficersFromFirestore, 
+  saveOfficerToFirestore, 
+  deleteOfficerFromFirestore, 
+  OfficerRecord 
+} from '../lib/firebase';
+import { useToast } from './ToastContext';
 
 interface AdminPortalProps {
   reports: CivicReport[];
   onUpdateStatus: (reportId: string, status: ReportStatus) => void;
   onAssignOfficer: (reportId: string, officer: Officer, fieldWorker?: { name: string; phone: string }) => void;
   onOpenResolutionModal: (report: CivicReport) => void;
-  officerInfo?: { name: string; department: string; badgeId: string } | null;
+  officerInfo?: { name: string; department: string; badgeId: string; email?: string } | null;
   onLogoutOfficer?: () => void;
 }
+
+const OWNER_EMAIL = 'swarrana2007@gmail.com';
 
 export const AdminPortal: React.FC<AdminPortalProps> = ({
   reports,
@@ -43,8 +56,111 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   officerInfo = null,
   onLogoutOfficer
 }) => {
-  // View mode tab: 'map' | 'kanban' | 'table' | 'officers' | 'analytics'
-  const [viewMode, setViewMode] = useState<'map' | 'kanban' | 'table' | 'officers' | 'analytics'>('map');
+  const { toast } = useToast();
+
+  // Check if active user is Owner swarrana2007@gmail.com
+  const isOwner = (
+    officerInfo?.email?.toLowerCase().trim() === OWNER_EMAIL ||
+    auth.currentUser?.email?.toLowerCase().trim() === OWNER_EMAIL
+  );
+
+  // View mode tab: 'map' | 'kanban' | 'table' | 'officers' | 'analytics' | 'owner_manage'
+  const [viewMode, setViewMode] = useState<'map' | 'kanban' | 'table' | 'officers' | 'analytics' | 'owner_manage'>('map');
+
+  // Owner Officer Management State
+  const [authorizedOfficers, setAuthorizedOfficers] = useState<OfficerRecord[]>([]);
+  const [loadingOfficers, setLoadingOfficers] = useState(false);
+  const [addOfficerLoading, setAddOfficerLoading] = useState(false);
+  const [newOfficerEmail, setNewOfficerEmail] = useState('');
+  const [newOfficerName, setNewOfficerName] = useState('');
+  const [newOfficerDept, setNewOfficerDept] = useState('Sanitation');
+  const [newOfficerBadge, setNewOfficerBadge] = useState('MUNI-OFF-2026');
+
+  // Officer Removal Confirmation Modal State
+  const [officerPendingDeletion, setOfficerPendingDeletion] = useState<OfficerRecord | null>(null);
+  const [deletingOfficer, setDeletingOfficer] = useState(false);
+
+  // Load authorized officers when in owner_manage view
+  useEffect(() => {
+    if (viewMode === 'owner_manage' && isOwner) {
+      loadOfficersList();
+    }
+  }, [viewMode, isOwner]);
+
+  const loadOfficersList = async () => {
+    setLoadingOfficers(true);
+    try {
+      const list = await fetchAllOfficersFromFirestore();
+      setAuthorizedOfficers(list);
+    } catch (err) {
+      console.warn('Error loading officers in AdminPortal:', err);
+    } finally {
+      setLoadingOfficers(false);
+    }
+  };
+
+  const handleAddOfficerByOwner = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isOwner) {
+      toast.error(`Only owner ${OWNER_EMAIL} can add officers.`, 'Permission Denied');
+      return;
+    }
+    if (!newOfficerEmail.trim() || !newOfficerName.trim()) {
+      toast.error('Please enter officer email and full name.', 'Invalid Data');
+      return;
+    }
+
+    setAddOfficerLoading(true);
+    try {
+      const cleanEmail = newOfficerEmail.trim().toLowerCase();
+      await saveOfficerToFirestore({
+        email: cleanEmail,
+        name: newOfficerName.trim(),
+        department: newOfficerDept,
+        badgeId: newOfficerBadge.trim() || 'MUNI-OFF-2026',
+        role: 'Authorized Officer',
+        createdAt: new Date().toISOString(),
+        addedBy: OWNER_EMAIL
+      });
+
+      toast.success(`Officer ${cleanEmail} authorized successfully!`, 'Officer Authorized');
+      setNewOfficerEmail('');
+      setNewOfficerName('');
+      loadOfficersList();
+    } catch (err: any) {
+      toast.error('Failed to add officer: ' + err?.message, 'Error');
+    } finally {
+      setAddOfficerLoading(false);
+    }
+  };
+
+  const handleRemoveOfficerByOwner = (officer: OfficerRecord) => {
+    if (!isOwner) {
+      toast.error(`Only owner ${OWNER_EMAIL} can remove officers.`, 'Permission Denied');
+      return;
+    }
+    if (officer.email?.toLowerCase().trim() === OWNER_EMAIL) {
+      toast.error('Cannot remove portal owner authorization.', 'Action Restricted');
+      return;
+    }
+    setOfficerPendingDeletion(officer);
+  };
+
+  const confirmExecuteOfficerDeletion = async () => {
+    if (!officerPendingDeletion || !isOwner) return;
+    const targetEmail = officerPendingDeletion.email;
+    setDeletingOfficer(true);
+    try {
+      await deleteOfficerFromFirestore(targetEmail);
+      toast.info(`Officer access revoked for ${targetEmail}.`, 'Officer Removed');
+      setOfficerPendingDeletion(null);
+      await loadOfficersList();
+    } catch (err: any) {
+      toast.error('Failed to remove officer: ' + err?.message, 'Error');
+    } finally {
+      setDeletingOfficer(false);
+    }
+  };
 
   // Officer search state
   const [officerSearch, setOfficerSearch] = useState('');
@@ -180,6 +296,20 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             <BarChart3 className="w-4 h-4" />
             <span>SLA Metrics</span>
           </button>
+
+          {isOwner && (
+            <button
+              onClick={() => setViewMode('owner_manage')}
+              className={`flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                viewMode === 'owner_manage'
+                  ? 'bg-amber-500 text-slate-950 font-black shadow ring-2 ring-amber-300'
+                  : 'text-amber-400 hover:text-amber-300 bg-amber-950/40 border border-amber-800/60'
+              }`}
+            >
+              <Crown className="w-4 h-4 text-amber-400" />
+              <span>Manage Officers (Owner)</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -772,6 +902,181 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         </div>
       )}
 
+      {/* OWNER OFFICER MANAGEMENT PANEL (swarrana2007@gmail.com Only) */}
+      {viewMode === 'owner_manage' && (
+        <div className="space-y-6">
+          {!isOwner ? (
+            <div className="p-8 rounded-3xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-center space-y-3">
+              <ShieldAlert className="w-12 h-12 text-rose-600 mx-auto" />
+              <h3 className="text-lg font-black text-rose-900 dark:text-rose-200">
+                Access Restricted: Owner Authority Required
+              </h3>
+              <p className="text-xs text-rose-700 dark:text-rose-300 max-w-md mx-auto">
+                Only the portal owner (<strong>{OWNER_EMAIL}</strong>) is authorized to add or remove municipal officers.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left 1 Col: Add New Officer Form */}
+              <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl space-y-4">
+                <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                  <div className="w-9 h-9 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">
+                    <UserPlus className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">
+                      Authorize New Officer
+                    </h3>
+                    <p className="text-[11px] text-slate-500">Owner portal control ({OWNER_EMAIL})</p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleAddOfficerByOwner} className="space-y-3.5 text-xs">
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Officer Email Address *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={newOfficerEmail}
+                      onChange={e => setNewOfficerEmail(e.target.value)}
+                      placeholder="officer.name@corporation.gov.in"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newOfficerName}
+                      onChange={e => setNewOfficerName(e.target.value)}
+                      placeholder="e.g. Inspector Ramesh Kumar"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Badge / Employee ID
+                    </label>
+                    <input
+                      type="text"
+                      value={newOfficerBadge}
+                      onChange={e => setNewOfficerBadge(e.target.value)}
+                      placeholder="MUNI-OFF-2026"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Assigned Department
+                    </label>
+                    <select
+                      value={newOfficerDept}
+                      onChange={e => setNewOfficerDept(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      <option value="Sanitation">Sanitation & Solid Waste Management</option>
+                      <option value="Water">Water Supply & Drainage</option>
+                      <option value="Electrical">Power, Streetlights & Electrical</option>
+                      <option value="Roads">Road Maintenance & Infrastructure</option>
+                      <option value="Public Safety">Public Safety & Disaster Cell</option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={addOfficerLoading}
+                    className="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-lg transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {addOfficerLoading ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Crown className="w-4 h-4" />
+                        <span>Authorize Officer into Database</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+
+              {/* Right 2 Cols: List of Authorized Officers with Delete Button */}
+              <div className="lg:col-span-2 p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Crown className="w-5 h-5 text-amber-500" />
+                    <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">
+                      Authorized Officer Directory in Firestore ({authorizedOfficers.length})
+                    </h3>
+                  </div>
+                  <button
+                    onClick={loadOfficersList}
+                    className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
+                    title="Refresh Registry"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${loadingOfficers ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+
+                {loadingOfficers ? (
+                  <div className="p-8 text-center text-xs text-slate-400">Loading officer records...</div>
+                ) : authorizedOfficers.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-slate-400">No authorized officers in Firestore. Fill out the form to authorize new officers.</div>
+                ) : (
+                  <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
+                    {authorizedOfficers.map((off, idx) => {
+                      const isThisOwner = off.email?.toLowerCase().trim() === OWNER_EMAIL;
+                      return (
+                        <div
+                          key={off.email || idx}
+                          className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 flex items-center justify-between gap-3 text-xs"
+                        >
+                          <div className="space-y-0.5">
+                            <div className="font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                              <span>{off.name}</span>
+                              {isThisOwner && (
+                                <span className="px-2 py-0.5 bg-amber-500/20 text-amber-600 dark:text-amber-300 text-[9px] uppercase font-black rounded-full border border-amber-300 dark:border-amber-700">
+                                  System Owner
+                                </span>
+                              )}
+                              <span className="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px] font-mono rounded-md">
+                                {off.badgeId || 'MUNI-OFF-2026'}
+                              </span>
+                            </div>
+                            <div className="text-slate-500 dark:text-slate-400 text-[11px]">
+                              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{off.email}</span> • {off.department}
+                            </div>
+                          </div>
+
+                          {!isThisOwner && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveOfficerByOwner(off)}
+                              className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 font-extrabold text-xs transition border border-rose-200 dark:border-rose-800 flex items-center gap-1.5 cursor-pointer shrink-0"
+                              title="Revoke officer access"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Remove</span>
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* OFFICER ASSIGNMENT MODAL */}
       {assigningReport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -831,6 +1136,68 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* OWNER OFFICER REMOVAL CONFIRMATION MODAL */}
+      {officerPendingDeletion && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 relative">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+
+            <div className="text-center space-y-2">
+              <h3 className="text-lg font-black text-slate-900 dark:text-white">
+                Revoke Officer Access?
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                Are you sure you want to remove this municipal officer? They will immediately lose access to the municipal command portal.
+              </p>
+            </div>
+
+            {/* Target Officer Card */}
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-1 text-xs">
+              <div className="font-extrabold text-slate-900 dark:text-white text-sm flex items-center justify-between">
+                <span>{officerPendingDeletion.name}</span>
+                <span className="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px] font-mono rounded">
+                  {officerPendingDeletion.badgeId || 'MUNI-OFF-2026'}
+                </span>
+              </div>
+              <div className="text-emerald-600 dark:text-emerald-400 font-mono font-bold">
+                {officerPendingDeletion.email}
+              </div>
+              <div className="text-slate-500 dark:text-slate-400">
+                Department: {officerPendingDeletion.department}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setOfficerPendingDeletion(null)}
+                disabled={deletingOfficer}
+                className="py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmExecuteOfficerDeletion}
+                disabled={deletingOfficer}
+                className="py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs shadow-lg transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {deletingOfficer ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Yes, Remove Officer</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -30,12 +30,31 @@
         "isAnonymous": { "type": "boolean" }
       },
       "required": ["id", "ticketNo", "title", "category", "description", "priority", "status", "location", "createdAt"]
+    },
+    "OfficerRecord": {
+      "title": "Municipal Officer Record",
+      "description": "Authorized municipal officer account details for restricted portal access",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "department": { "type": "string" },
+        "badgeId": { "type": "string" },
+        "role": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["email", "name", "department", "badgeId"]
     }
   },
   "firestore": {
     "/reports/{reportId}": {
       "schema": "CivicReport",
       "description": "Global collection of civic reports filed across municipal corporations"
+    },
+    "/officers/{officerId}": {
+      "schema": "OfficerRecord",
+      "description": "Restricted collection of authorized municipal officers verified against Firebase Auth"
     }
   }
 }
